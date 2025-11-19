@@ -1,0 +1,25 @@
+# Default: use LF in the repo, but allow CRLF checkout on Windows
+* text=auto
+
+# Shell scripts must use LF
+*.sh text eol=lf
+
+# Batch scripts must use CRLF
+*.bat text eol=crlf
+
+# GitHub Actions YAML must always be LF
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# C++, headers, JS, HTML: auto is good
+*.cpp text
+*.hpp text
+*.h   text
+*.js  text
+*.html text
+*.css  text
+
+# Prevent accidental binary normalization
+*.png binary
+*.jpg binary
+*.wasm binary
