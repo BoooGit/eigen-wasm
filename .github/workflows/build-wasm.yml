@@ -1,15 +1,14 @@
 name: Build Eigen ? WebAssembly
 
-# triggers: on push to main, on tag, and manual dispatch
 on:
   push:
     branches: ["main"]
-  workflow_dispatch: {}    # allows manual runs from Actions UI
+  workflow_dispatch:
   release:
-    types: [created]
+    types: [created]     # triggered when you create a GitHub Release
 
 permissions:
-  contents: read            # needed to checkout code & submodules
+  contents: write         # needed for uploading release assets
   actions: read
 
 concurrency:
@@ -18,54 +17,103 @@ concurrency:
 
 jobs:
   build:
-    name: Build WASM (Ubuntu)
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]  
+        # Windows is possible but Emscripten installs slower:
+        # os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      - name: Checkout repository (with submodules)
+
+      # -----------------------------
+      # Checkout repository + submodules
+      # -----------------------------
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Set up cache for emsdk
-        uses: actions/cache@v4
+      # -----------------------------
+      # Cache Emscripten SDK
+      # -----------------------------
+      - name: Cache emsdk
         id: emsdk-cache
+        uses: actions/cache@v4
         with:
-          path: ~/.emsdk
-          key: emsdk-cache-v1-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt','**/src/**') }}
+          path: |
+            emsdk/
+            ~/.emscripten_cache
+          key: emsdk-${{ runner.os }}-${{ hashFiles('**/*.cmake','**/CMakeLists.txt') }}
           restore-keys: |
-            emsdk-cache-v1-${{ runner.os }}-
+            emsdk-${{ runner.os }}-
 
-      - name: Install Emscripten SDK (emsdk)
+      # -----------------------------
+      # Install Emscripten SDK
+      # -----------------------------
+      - name: Install Emscripten SDK
+        shell: bash
         run: |
-          git clone https://github.com/emscripten-core/emsdk.git ~/emsdk
-          cd ~/emsdk
+          if [ ! -d "emsdk" ]; then
+            git clone https://github.com/emscripten-core/emsdk.git emsdk
+          fi
+          cd emsdk
           ./emsdk install latest
           ./emsdk activate latest
-          echo "source ~/emsdk/emsdk_env.sh" >> $GITHUB_ENV
-
-      - name: Configure environment
-        run: |
-          source ~/emsdk/emsdk_env.sh
+          source ./emsdk_env.sh
           emcc --version
+          echo "EMSDK=$PWD" >> $GITHUB_ENV
+          echo "source $PWD/emsdk_env.sh" >> $GITHUB_ENV
 
-      - name: Build with CMake + Emscripten
+      # ------------------------------------------------
+      # Cache build/ directory to speed up incremental rebuilds
+      # ------------------------------------------------
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/
+          key: build-cache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            build-cache-${{ runner.os }}-
+
+      # ------------------------------------------------
+      # Build Eigen WASM
+      # ------------------------------------------------
+      - name: Configure & Build with CMake
+        shell: bash
         run: |
-          source ~/emsdk/emsdk_env.sh
+          source $EMSDK/emsdk_env.sh
           mkdir -p build
           cd build
-          emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
+          emcmake cmake ..
           emmake make -j$(nproc)
         working-directory: ${{ github.workspace }}
 
-      - name: List build artifacts
-        run: ls -la build || true
+      - name: Show build output
+        run: ls -R build || true
 
-      - name: Upload WASM artifact
+      # ------------------------------------------------
+      # Upload as CI Artifact
+      # ------------------------------------------------
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: eigen-wasm-build
+          name: eigen-wasm-${{ matrix.os }}
           path: build/
-          retention-days: 30
+
+      # ------------------------------------------------
+      # Attach to GitHub Release (only when tagging)
+      # ------------------------------------------------
+      - name: Upload release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/**/*.wasm
+            build/**/*.js
+            build/**/*.data
+            build/**/*.html
