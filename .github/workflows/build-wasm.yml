@@ -3,12 +3,12 @@ name: Build Eigen ? WebAssembly
 on:
   push:
     branches: ["main"]
-  workflow_dispatch:
+  workflow_dispatch: {}
   release:
-    types: [created]     # triggered when you create a GitHub Release
+    types: [created]
 
 permissions:
-  contents: write         # needed for uploading release assets
+  contents: write
   actions: read
 
 concurrency:
@@ -23,12 +23,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]  
-        # Windows is possible but Emscripten installs slower:
-        # os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
 
     steps:
-
       # -----------------------------
       # Checkout repository + submodules
       # -----------------------------
@@ -61,24 +58,27 @@ jobs:
           if [ ! -d "emsdk" ]; then
             git clone https://github.com/emscripten-core/emsdk.git emsdk
           fi
+
           cd emsdk
           ./emsdk install latest
           ./emsdk activate latest
-          source ./emsdk_env.sh
-          emcc --version
+
           echo "EMSDK=$PWD" >> $GITHUB_ENV
           echo "source $PWD/emsdk_env.sh" >> $GITHUB_ENV
 
+          source ./emsdk_env.sh
+          emcc --version
+
       # ------------------------------------------------
-      # Cache build/ directory to speed up incremental rebuilds
+      # Cache build directory (optional incremental builds)
       # ------------------------------------------------
       - name: Cache build directory
         uses: actions/cache@v4
         with:
           path: build/
-          key: build-cache-${{ runner.os }}-${{ github.sha }}
+          key: build-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
-            build-cache-${{ runner.os }}-
+            build-${{ runner.os }}-
 
       # ------------------------------------------------
       # Build Eigen WASM
@@ -87,11 +87,12 @@ jobs:
         shell: bash
         run: |
           source $EMSDK/emsdk_env.sh
+
           mkdir -p build
           cd build
-          emcmake cmake ..
+
+          emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
           emmake make -j$(nproc)
-        working-directory: ${{ github.workspace }}
 
       - name: Show build output
         run: ls -R build || true
@@ -106,7 +107,7 @@ jobs:
           path: build/
 
       # ------------------------------------------------
-      # Attach to GitHub Release (only when tagging)
+      # Attach to GitHub Release (tag builds)
       # ------------------------------------------------
       - name: Upload release assets
         if: startsWith(github.ref, 'refs/tags/')
