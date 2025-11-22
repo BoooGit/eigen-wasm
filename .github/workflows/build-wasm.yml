@@ -69,13 +69,13 @@ jobs:
           ./emsdk install latest
           ./emsdk activate latest
 
+          echo "[DEBUG] After activation:"; ls -al
+          echo "[DEBUG] emsdk_env.sh:"; head -n 50 emsdk_env.sh || true
+
           # Manual sourcing during same step
           source ./emsdk_env.sh
           echo "[DEBUG] After manual sourcing:"; env | sort
           emcc --version
-
-          echo "[DEBUG] After activation:"; ls -al
-          echo "[DEBUG] emsdk_env.sh:"; head -n 50 emsdk_env.sh || true
 
           # --- CRITICAL DEBUGGING: what is written to GITHUB_ENV? ---
           echo "EMSDK=$(pwd)" >> $GITHUB_ENV
