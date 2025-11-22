@@ -1,4 +1,4 @@
-name: Build Eigen ? WebAssembly
+name: Build Eigen – WebAssembly (Debug)
 
 on:
   push:
@@ -55,19 +55,33 @@ jobs:
       - name: Install Emscripten SDK
         shell: bash
         run: |
+          set -x
+          echo "[DEBUG] Current dir: $(pwd)"
+          env | sort
+
           if [ ! -d "emsdk" ]; then
             git clone https://github.com/emscripten-core/emsdk.git emsdk
           fi
 
           cd emsdk
+          echo "[DEBUG] emsdk directory contents:"; ls -al
+
           ./emsdk install latest
           ./emsdk activate latest
 
-          echo "EMSDK=$PWD" >> $GITHUB_ENV
-          echo "source $PWD/emsdk_env.sh" >> $GITHUB_ENV
-
+          # Manual sourcing during same step
           source ./emsdk_env.sh
+          echo "[DEBUG] After manual sourcing:"; env | sort
           emcc --version
+
+          echo "[DEBUG] After activation:"; ls -al
+          echo "[DEBUG] emsdk_env.sh:"; head -n 50 emsdk_env.sh || true
+
+          # --- CRITICAL DEBUGGING: what is written to GITHUB_ENV? ---
+          echo "EMSDK=$(pwd)" >> $GITHUB_ENV
+          echo "source $(pwd)/emsdk_env.sh" >> $GITHUB_ENV
+
+          echo "[DEBUG] Contents of GITHUB_ENV after writing:"; cat $GITHUB_ENV
 
       # ------------------------------------------------
       # Cache build directory (optional incremental builds)
@@ -86,13 +100,18 @@ jobs:
       - name: Configure & Build with CMake
         shell: bash
         run: |
+          set -x
+          echo "[DEBUG] Before sourcing in build step:"; env | sort
+          echo "[DEBUG] GITHUB_ENV:"; cat $GITHUB_ENV || true
+
           source $EMSDK/emsdk_env.sh
+          echo "[DEBUG] After sourcing emsdk_env.sh:"; env | sort
 
           mkdir -p build
           cd build
 
           emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
-          emmake make -j$(nproc)
+          emmake make -j$(nproc || sysctl -n hw.ncpu)
 
       - name: Show build output
         run: ls -R build || true
