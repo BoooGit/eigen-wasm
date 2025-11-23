@@ -2,9 +2,12 @@
 #include <Eigen/Dense>
 #include <vector>
 #include <cstdint>
+#include <cmath>
+
 using Eigen::MatrixXd;
 using Eigen::Map;
 using Eigen::RowMajor;
+using Eigen::VectorXd;
 
 extern "C" {
 
@@ -33,8 +36,7 @@ void compute_eigenpairs_real_symmetric(const double* A, int n, double* out_evals
     auto vals = es.eigenvalues();
     auto vecs = es.eigenvectors(); // columns are eigenvectors
     for (int i=0;i<n;i++) out_evals[i] = vals(i);
-    // write eigenvectors into out_evecs row-major as columns contiguous (col major -> copy carefully)
-    // we will store row-major (row0..rowN-1 repeated for each row)
+    // write eigenvectors into out_evecs row-major as rows contiguous
     for (int r=0;r<n;r++) {
         for (int c=0;c<n;c++) {
             out_evecs[r*n + c] = vecs(r,c); // vecs is column-major, but indexing (r,c) works
