@@ -77,9 +77,13 @@ jobs:
           echo "[DEBUG] After manual sourcing:"; env | sort
           emcc --version
 
-          # --- CRITICAL DEBUGGING: what is written to GITHUB_ENV? ---
+          # --- FIX: Write valid environment variables to GITHUB_ENV ---
+          # Write EMSDK path
           echo "EMSDK=$(pwd)" >> $GITHUB_ENV
-          echo "source $(pwd)/emsdk_env.sh" >> $GITHUB_ENV
+
+          # Export ALL emsdk-related environment variables as KEY=VALUE pairs
+          # (GITHUB_ENV does NOT allow commands like 'source ...')
+          env | grep -E 'EMSDK|EM_CACHE|EM_CONFIG|EMSCRIPTEN|NODE|EMCC' >> $GITHUB_ENV
 
           echo "[DEBUG] Contents of GITHUB_ENV after writing:"; cat $GITHUB_ENV
 
