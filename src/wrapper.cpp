@@ -74,12 +74,14 @@ void compute_eigenpairs_general(const double* A, int n, double* out_real, double
     for (int i=0;i<n;i++) {
         out_real[i] = vals(i).real();
         out_imag[i] = vals(i).imag();
+	}
     // write eigenvectors into out_evecs row-major as rows contiguous
     for (int r=0;r<n;r++) {
         for (int c=0;c<n;c++) {
             out_evecs_real[r*n + c] = vecs(r,c).real(); // vecs is column-major, but indexing (r,c) works
 			out_evecs_imag[r*n + c] = vecs(r,c).imag(); // vecs is column-major, but indexing (r,c) works
-        }		
+        }
+	}		
 }
 
 // 5) adjacency -> normalized laplacian -> spectrum
